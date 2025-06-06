@@ -1,0 +1,9 @@
+/backend/
+│  app.py (Flask API)
+│  process_audio.py (Whisper, TTS, etc)
+│  requirements.txt
+
+/android-app/
+│  MainActivity.kt
+│  Network.kt (API-Calls)
+│  AudioRecorder.kt

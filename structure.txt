@@ -7,3 +7,14 @@
 │  MainActivity.kt
 │  Network.kt (API-Calls)
 │  AudioRecorder.kt
+
+
+----
+step by step (process_audio.py)
+
+1. model auswählen
+2. audio bekommen
+3. zu richtigem format konvertieren
+4. sprache erkennen 
+5. if sprache != known_language : übersetzen
+6. übersetzten text in TTS 

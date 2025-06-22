@@ -1,0 +1,52 @@
+
+import os
+Pfade bauen, Dateien aufrufen, Ordner verwalten
+
+import numpy
+Audiodaten als Array (z. B. von soundfile) verarbeiten, für Modelle etc.
+
+import wave	
+Lesen/schreiben von .wav Dateien → eher basic (nicht zwingend nötig)
+
+import whisper
+Speech-to-Text (also Sprache → Text)
+
+from langdetect import detect
+Sprache von Text erkennen → z. B. um rauszufinden, ob übersetzt werden soll
+
+from gtts import gTTS
+Text-to-Speech mit Google TTS → Text → Sprache
+
+import soundfile
+Audiodateien lesen/schreiben (v. a. .wav) als NumPy-Array
+
+import ffmpeg
+Audioformate konvertieren (z. B. mp3 → wav), Audio normalisieren, trimmen
+ffmpeg.exe	Die eigentliche ausführbare Datei, die von ffmpeg-python genutzt wird
+
+
+
+
+---
+Audio aufnehmen oder laden → mit z.B. Mikrofon oder Datei
+evtl. sounddevice oder pyaudio später
+
+Format umwandeln (z.B. mp3 → wav)
+ffmpeg-python mit ffmpeg.exe
+
+WAV-Datei lesen →
+soundfile.read() → ergibt NumPy-Audioarray
+
+Sprache erkennen / Sprache → Text
+whisper.transcribe(...)
+
+Sprache des Texts erkennen
+langdetect.detect("Text")
+
+Text übersetzen
+
+Text → Sprache (TTS)
+gTTS(text, lang).save("tts.mp3")
+
+Audio abspielen
+(z. B. mit playsound, pydub, pygame, oder systemabhängig)

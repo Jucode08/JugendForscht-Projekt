@@ -1,12 +1,7 @@
-import os
 import numpy as np
-import wave  # für Audio-Dateien
 import whisper  # Speech-to-Text
-from googletrans import Translator
 from langdetect import detect  # Sprache erkennen
 from gtts import gTTS  # Text-to-Speech
-import soundfile as sf
-import ffmpeg
 from deep_translator import GoogleTranslator
 
 #imports for testing
@@ -41,7 +36,7 @@ print("Sprache erkannt als:", language)
 print("Wahrscheinlichkeiten: ", "de: " , probabilities["de"], " en: " , probabilities["en"])
 
 # Transkription
-# options = whisper.DecodingOptions(fp16=False)  # wenn du keine GPU nutzt
+# options = whisper.DecodingOptions(fp16=False)  # wenn man keine GPU nutzt
 result = whisper.decode(model, mel)
 
 print(result.text)
@@ -51,7 +46,4 @@ if language not in knownLanguages:
     tts = gTTS(text=translated, lang=knownLanguages[0])
     tts.save("output.mp3")
     print(translated)
-
-
-# tts = gTTS(text=result.text, lang=knownLanguages[0])
 

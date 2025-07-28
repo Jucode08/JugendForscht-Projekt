@@ -6,13 +6,15 @@ from deep_translator import GoogleTranslator
 
 #imports for testing
 import sounddevice as sd
+from playsound import playsound 
 
 import timeit 
 # for i in range(10):
 recordDuration = 3
 samplerate = 16000  # 16 kHz
 
-knownLanguages = ["de", "en"]
+# knownLanguages = ["de", "en"]
+knownLanguages = ["de"]
 model = whisper.load_model("tiny")
 
 
@@ -48,6 +50,8 @@ if language not in knownLanguages:
     tts = gTTS(text=translated, lang=knownLanguages[0])
     tts.save("output.mp3")
     print(translated)
+    
+playsound("output.mp3")
 
 # t1 = timeit.default_timer()
 # demo1()

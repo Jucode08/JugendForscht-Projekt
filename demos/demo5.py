@@ -3,7 +3,8 @@
 import numpy as np
 import whisper  # Speech-to-Text
 from langdetect import detect  # Sprache erkennen
-from gtts import gTTS  # Text-to-Speech
+import asyncio
+import edge_tts # Text-to-Speech
 from deep_translator import GoogleTranslator
 import os
 
@@ -16,12 +17,13 @@ import sys
 recordDuration = 4
 samplerate = 16000  # 16 kHz
 
-knownLanguages = ["de"]
+knownLanguages = ["en", "de"]
 model = whisper.load_model("tiny")
 
-translationSupport = ['ar', 'zh-TW', 'en', 'fr', 'de', 'hi', 'id', 'it', 'ja', 'kn', 'ko', 'mr', 'fa', 'pl', 'pt', 'ru', 'es', 'sw', 'ta', 'th', 'tr', 'uk', 'ur', 'vi']
 
-selected_language = "fr"
+translationSupport = ['ar', 'de', 'en', 'es', 'fa', 'fr', 'hi', 'id', 'it', 'ja', 'kn', 'ko', 'mr', 'pl', 'pt', 'ru', 'sw', 'ta', 'th', 'tr', 'uk', 'ur', 'vi', 'zh-CN', 'zh-TW']
+
+selected_language = None
 
 
 def record():
@@ -42,45 +44,62 @@ def process_audio(recording):
     audio = whisper.pad_or_trim(recording)
     mel = whisper.log_mel_spectrogram(audio).to(model.device)
     confidence = whisper.decode(model, mel).avg_logprob
-    print(f"confidence: {confidence}")
+    # print(f"confidence: {confidence}")
     # if confidence < -.97:
     #     print("Transkription zu unsicher – überspringe")
     #     sys.exit()
 
-    _, probabilities = model.detect_language(mel)
-    language = max(probabilities, key=probabilities.get)
-    if language not in translationSupport:
-        print("language not supported")
-        sys.exit()
-    print("Sprache erkannt als:", language)
+    if selected_language == None:
+        _, probabilities = model.detect_language(mel)
+        language = max(probabilities, key=probabilities.get)
+        if language not in translationSupport:
+            print("language not supported")
+            sys.exit()
+    else:
+        language = selected_language
 
+    print("Sprache erkannt als:", language)
+    
     # Transkription
     options = whisper.DecodingOptions(language=selected_language, fp16=False)
     result = whisper.decode(model, mel, options)
 
-    print(result.text)
+    print(f"erkannter Text: {result.text}")
+    if result.text == "..." or result.text.lower() == "you":
+        return
     
     if language not in knownLanguages:
         translated = GoogleTranslator(source=language, target=knownLanguages[0]).translate(result.text) 
+        # textToSpeech(translated)
         textToSpeech(translated)
-        print(translated)
+        print(f"übersetzter Text: {translated}")
+        
+        play_and_delete("output.mp3")
     
-    play_and_delete("output.mp3")
     # threading.Thread(target=play_and_delete, args=("output.mp3",), daemon=True).start()
     
-def textToSpeech(text):
-    tts = gTTS(text=text, lang=knownLanguages[0])
-    tts.save("output.mp3")
+# def textToSpeech(text):
+#     tts = gTTS(text=text, lang=knownLanguages[0])
+#     tts.save("output.mp3")
+    
+def textToSpeech(text, voice="en-US-AriaNeural", rate="+0%"):
+    async def inner():
+        communicate = edge_tts.Communicate(text, voice, rate=rate)
+        await communicate.save("output.mp3")
+    asyncio.run(inner())
+
+
+    
 
 def play_and_delete(path): 
     playsound(path)
     os.remove(path) 
 
+import time as t
 
-
-
-
-record()
+for i in range(10):
+    record()
+    t.sleep(0.1)
 
 
 

@@ -64,8 +64,9 @@ def process_audio(recording):
         translated = GoogleTranslator(source=language, target=knownLanguages[0]).translate(result.text) 
         textToSpeach(language, translated)
         print(translated)
+        
+        play_and_delete("output.mp3")
     
-    play_and_delete("output.mp3")
     # threading.Thread(target=play_and_delete, args=("output.mp3",), daemon=True).start()
 
     

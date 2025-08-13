@@ -57,8 +57,8 @@ def process_audio(recording):
         tts = gTTS(text=translated, lang=knownLanguages[0])
         tts.save("output.mp3")
         print(translated)
+        threading.Thread(target=play_and_delete, args=("output.mp3",), daemon=True).start()
         
-    threading.Thread(target=play_and_delete, args=("output.mp3",), daemon=True).start()
 
 while True:
     print("recording...")

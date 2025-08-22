@@ -1,25 +1,25 @@
-# change: other TTS - Edge TTS (Online) + differnt voice types
+# change: faster_whisper + ffmpeg + looped
 
 import numpy as np
-import whisper  # Speech-to-Text
-from langdetect import detect  # Sprache erkennen
+from faster_whisper import WhisperModel  # Speech-to-Text
 import asyncio
 import edge_tts  # Text-to-Speech
 from deep_translator import GoogleTranslator
 import os
-
+import ffmpeg
 
 # imports for testing
 import sounddevice as sd
+import soundfile as sf
 from playsound import playsound
 import sys
 
-recordDuration = 4
+
+recordDuration = 3
 samplerate = 16000  # 16 kHz
 
 known_languages = ["de", "en"]
-model = whisper.load_model("tiny")
-
+model = WhisperModel("tiny", device="cpu", compute_type="int8") 
 
 translation_support = ['ar', 'de', 'en', 'es', 'fa', 'fr', 'hi', 'id', 'it', 'ja', 'kn', 'ko', 'mr', 'pl', 'pt', 'ru', 'sw', 'ta', 'th', 'tr', 'uk', 'ur', 'vi', 'zh-CN', 'zh-TW']
 
@@ -55,7 +55,6 @@ default_voices = {
 selected_gender = "male"
 selected_voice = default_voices[known_languages[0]][selected_gender]
 
-
 def record():
     print("recording...")
     recording = sd.rec(
@@ -66,45 +65,46 @@ def record():
     process_audio(recording)
     # threading.Thread(target=process_audio, args=(recording,), daemon=True).start()
 
+def preprocess_ffmpeg(recording):
+    sf.write("temp.wav", recording, samplerate)
+    out, _ = (
+        ffmpeg
+        .input("temp.wav")
+        .output("pipe:", format="s16le", acodec="pcm_s16le", ac=1, ar="16000")
+        .run(capture_stdout=True, quiet=True)
+    )
+    audio = np.frombuffer(out, np.int16).astype(np.float32) / 32768.0
+    return audio
 
 def process_audio(recording):
 
+
+    # Preprocessing
+    
     # Wandelt (N, 1) => (N,) um und castet auf float32
     recording = recording.flatten().astype(np.float32)
+    
+    recording = preprocess_ffmpeg(recording)
+    os.remove("temp.wav")
 
-    # Whisper-Preprocessing
-    audio = whisper.pad_or_trim(recording)
-    mel = whisper.log_mel_spectrogram(audio).to(model.device)
-    confidence = whisper.decode(model, mel).avg_logprob
-    # print(f"confidence: {confidence}")
-    # if confidence < -.97:
-    #     print("Transkription zu unsicher – überspringe")
-    #     sys.exit()
-
-    if selected_language == None:
-        _, probabilities = model.detect_language(mel)
-        language = max(probabilities, key=probabilities.get)
-        if language not in translation_support:
-            print("language not supported")
-            sys.exit()
-    else:
-        language = selected_language
-
-    print("Sprache erkannt als:", language)
 
     # Transkription
-    options = whisper.DecodingOptions(language=selected_language, fp16=False)
-    result = whisper.decode(model, mel, options)
+    segments, info = model.transcribe(recording, language=selected_language, beam_size=1)
+    text = " ".join([s.text for s in segments]).strip()
 
-    print(f"erkannter Text: {result.text}")
-    if result.text == "..." or result.text.lower() == "you":
+    print(f"erkannter Text: {text}")
+    if text == "..." or text.lower() == "you":
         return
 
+    
+    language = info.language
+    # info.language_probability
+    
     if language not in known_languages:
         translated = GoogleTranslator(
             source=language, target=known_languages[0]
-        ).translate(result.text)
-        # textToSpeech(translated)
+        ).translate(text)
+
         textToSpeech(translated)
         print(f"übersetzter Text: {translated}")
 

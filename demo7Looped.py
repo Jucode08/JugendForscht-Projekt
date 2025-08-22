@@ -1,29 +1,33 @@
-# change: other TTS - Edge TTS (Online) + differnt voice types
+# change: keine temp.wav -> Bytes-Stream
 
 import numpy as np
-import whisper  # Speech-to-Text
-from langdetect import detect  # Sprache erkennen
+from faster_whisper import WhisperModel  # Speech-to-Text
 import asyncio
 import edge_tts  # Text-to-Speech
 from deep_translator import GoogleTranslator
 import os
+import ffmpeg
+import io
+import threading
 
 
 # imports for testing
 import sounddevice as sd
+import soundfile as sf
 from playsound import playsound
-import sys
+import time as t
 
-recordDuration = 4
+
+recordDuration = 2.5
 samplerate = 16000  # 16 kHz
 
 known_languages = ["de", "en"]
-model = whisper.load_model("tiny")
+model = WhisperModel("tiny", device="cpu", compute_type="int8") 
 
 
 translation_support = ['ar', 'de', 'en', 'es', 'fa', 'fr', 'hi', 'id', 'it', 'ja', 'kn', 'ko', 'mr', 'pl', 'pt', 'ru', 'sw', 'ta', 'th', 'tr', 'uk', 'ur', 'vi', 'zh-CN', 'zh-TW']
 
-selected_language = "fr"
+selected_language = "fr"  # None := Sprache erkennen
 
 default_voices = {
     "ar": {"male": "ar-AE-HamdanNeural", "female": "ar-AE-FatimaNeural"},
@@ -63,55 +67,34 @@ def record():
     )  # channels=1 => mono , channels=2 => stereo
     sd.wait()
 
-    process_audio(recording)
-    # threading.Thread(target=process_audio, args=(recording,), daemon=True).start()
+    return recording
+
+def preprocess_ffmpeg(recording):
+    # Schreibe das NumPy-Array in einen Bytes-Stream (wie eine Datei im RAM)
+    buf = io.BytesIO()
+    sf.write(buf, recording, samplerate, format="WAV")
+    buf.seek(0)  # zurück an den Anfang
+    
+    # Füttere ffmpeg direkt mit Bytes (pipe:0 = stdin, pipe:1 = stdout)
+    out, _ = (
+        ffmpeg
+        .input("pipe:0")
+        .output("pipe:1", format="s16le", acodec="pcm_s16le", ac=1, ar="16000")
+        .run(input=buf.read(), capture_stdout=True, quiet=True)
+    )
+    audio = np.frombuffer(out, np.int16).astype(np.float32) / 32768.0
+    return audio
 
 
-def process_audio(recording):
-
-    # Wandelt (N, 1) => (N,) um und castet auf float32
-    recording = recording.flatten().astype(np.float32)
-
-    # Whisper-Preprocessing
-    audio = whisper.pad_or_trim(recording)
-    mel = whisper.log_mel_spectrogram(audio).to(model.device)
-    confidence = whisper.decode(model, mel).avg_logprob
-    # print(f"confidence: {confidence}")
-    # if confidence < -.97:
-    #     print("Transkription zu unsicher – überspringe")
-    #     sys.exit()
-
-    if selected_language == None:
-        _, probabilities = model.detect_language(mel)
-        language = max(probabilities, key=probabilities.get)
-        if language not in translation_support:
-            print("language not supported")
-            sys.exit()
-    else:
-        language = selected_language
-
-    print("Sprache erkannt als:", language)
-
-    # Transkription
-    options = whisper.DecodingOptions(language=selected_language, fp16=False)
-    result = whisper.decode(model, mel, options)
-
-    print(f"erkannter Text: {result.text}")
-    if result.text == "..." or result.text.lower() == "you":
-        return
-
+def translate(language, text):
     if language not in known_languages:
         translated = GoogleTranslator(
             source=language, target=known_languages[0]
-        ).translate(result.text)
-        # textToSpeech(translated)
-        textToSpeech(translated)
-        print(f"übersetzter Text: {translated}")
-
-        play_and_delete("output.mp3")
-
-    # threading.Thread(target=play_and_delete, args=("output.mp3",), daemon=True).start()
-
+        ).translate(text)
+        return translated
+    else:
+        return None
+        
 
 def textToSpeech(text, voice=selected_voice, rate="+0%"):
     async def inner():
@@ -125,15 +108,31 @@ def play_and_delete(path):
     playsound(path)
     os.remove(path)
 
+def process_audio(recording):
 
-import time as t
+    # Preprocessing 
+    recording = preprocess_ffmpeg(recording)
 
-inp = input("loop?(y/n): ").lower()
-if inp == "y":
-    for i in range(5):
-        record()
-        t.sleep(0.1)
-elif inp == "quit":
-    print("exiting...")
-else:
-    record()
+    # Transkription
+    segments, info = model.transcribe(recording, language=selected_language, beam_size=1)
+    text = " ".join([s.text for s in segments]).strip()
+
+    print(f"erkannter Text: {text}")
+    
+    language = info.language
+    
+    translated = translate(language, text)
+    if not translated:
+        return
+    print(f"übersetzter Text: {translated}")
+    
+    textToSpeech(translated)
+    
+    threading.Thread(target=play_and_delete, args=("output.mp3",), daemon=True).start()
+
+while True:
+    recording = record()
+    
+    threading.Thread(target=process_audio, args=(recording,), daemon=True).start()
+
+    t.sleep(.5)

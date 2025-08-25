@@ -1,4 +1,4 @@
-# change: keine temp.wav -> Bytes-Stream
+# change: VAD start
 
 import numpy as np
 from faster_whisper import WhisperModel  # Speech-to-Text
@@ -9,7 +9,9 @@ import os
 import ffmpeg
 import io
 import threading
+import webrtcvad
 
+from utils import preprocess_ffmpeg
 
 # imports for testing
 import sounddevice as sd
@@ -24,6 +26,7 @@ samplerate = 16000  # 16 kHz
 known_languages = ["de", "en"]
 model = WhisperModel("tiny", device="cpu", compute_type="int8") 
 
+vad = webrtcvad.Vad(2)
 
 translation_support = ['ar', 'de', 'en', 'es', 'fa', 'fr', 'hi', 'id', 'it', 'ja', 'kn', 'ko', 'mr', 'pl', 'pt', 'ru', 'sw', 'ta', 'th', 'tr', 'uk', 'ur', 'vi', 'zh-CN', 'zh-TW']
 
@@ -69,22 +72,6 @@ def record():
 
     return recording
 
-def preprocess_ffmpeg(recording):
-    # Schreibe das NumPy-Array in einen Bytes-Stream (wie eine Datei im RAM)
-    buf = io.BytesIO()
-    sf.write(buf, recording, samplerate, format="WAV")
-    buf.seek(0)  # zurück an den Anfang
-    
-    # Füttere ffmpeg direkt mit Bytes (pipe:0 = stdin, pipe:1 = stdout)
-    out, _ = (
-        ffmpeg
-        .input("pipe:0")
-        .output("pipe:1", format="s16le", acodec="pcm_s16le", ac=1, ar="16000")
-        .run(input=buf.read(), capture_stdout=True, quiet=True)
-    )
-    audio = np.frombuffer(out, np.int16).astype(np.float32) / 32768.0
-    return audio
-
 
 def translate(language, text):
     if language not in known_languages:
@@ -94,9 +81,9 @@ def translate(language, text):
         return translated
     else:
         return None
-        
 
-def textToSpeech(text, voice=selected_voice, rate="+0%"):
+
+def textToSpeech(text, voice=selected_voice, rate="+10%"):
     async def inner():
         communicate = edge_tts.Communicate(text, voice, rate=rate)
         await communicate.save("output.mp3")
@@ -108,10 +95,48 @@ def play_and_delete(path):
     playsound(path)
     os.remove(path)
 
+
+def float32_to_pcm16(audio_float32: np.ndarray) -> bytes:
+    #Clipping, falls Werte leicht außerhalb [-1, 1] sind (numerische Fehler)
+    audio_float32 = np.clip(audio_float32, -1.0, 1.0)
+
+    #Skalieren auf int16-Bereich
+    audio_int16 = (audio_float32 * 32767).astype(np.int16)
+
+    #In Bytes umwandeln
+    return audio_int16.tobytes()
+
+def frame_generator(frame_duration_ms, audio_bytes, samplerate):
+    frames = []
+    """
+    Schneidet die PCM-Bytes in gleichlange Frames.
+    frame_size_in_bytes = samplerate * frame_ms/1000 * 2 (weil 16-bit = 2 Bytes)
+    """
+    frame_size = int(samplerate * (frame_duration_ms / 1000.0) * 2)
+    offset = 0
+    # nur volle Frames an VAD geben
+    while offset + frame_size <= len(audio_bytes):
+        frames.append(audio_bytes[offset:offset + frame_size])
+        offset += frame_size
+    return frames
+
+
 def process_audio(recording):
 
     # Preprocessing 
-    recording = preprocess_ffmpeg(recording)
+    recording = preprocess_ffmpeg(recording, samplerate)
+    
+    # float32 -> PCM16 Bytes
+    audio_bytes = float32_to_pcm16(recording)
+
+    # Frames erzeugen
+    frame_ms=30
+    frames = frame_generator(frame_ms, audio_bytes, samplerate)
+    # print(frames)
+    
+    for frame in frames:
+        print(vad.is_speech(frame, samplerate))
+    
 
     # Transkription
     segments, info = model.transcribe(recording, language=selected_language, beam_size=1)
@@ -135,4 +160,4 @@ while True:
     
     threading.Thread(target=process_audio, args=(recording,), daemon=True).start()
 
-    t.sleep(.5)
+    t.sleep(2)

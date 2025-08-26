@@ -78,8 +78,8 @@ if input("Continue?: "):
     print(t2-t1)
     
     print("\nwithout vad:")
-    t1 = timeit.default_timer()
+    t3 = timeit.default_timer()
     for i in range(10):
         without_vad(audio)
-    t2 = timeit.default_timer()  
-    print(t2-t1)
+    t4 = timeit.default_timer()  
+    print(t4-t3)

@@ -1,4 +1,4 @@
-# change: VAD removal
+# change: TTS Queue
 
 from faster_whisper import WhisperModel  # Speech-to-Text
 import asyncio
@@ -6,6 +6,9 @@ import edge_tts  # Text-to-Speech
 from deep_translator import GoogleTranslator
 import os
 import threading
+import uuid
+import queue
+
 
 from utils import preprocess_ffmpeg
 
@@ -18,13 +21,13 @@ import time as t
 recordDuration = 2.5
 samplerate = 16000  # 16 kHz
 
-known_languages = ["de", "en"]
+known_languages = ["en"]
 model = WhisperModel("tiny", device="cpu", compute_type="int8") 
 
 
 translation_support = ['ar', 'de', 'en', 'es', 'fa', 'fr', 'hi', 'id', 'it', 'ja', 'kn', 'ko', 'mr', 'pl', 'pt', 'ru', 'sw', 'ta', 'th', 'tr', 'uk', 'ur', 'vi', 'zh-CN', 'zh-TW']
 
-selected_language = "fr"  # None := Sprache erkennen
+selected_language = "de"  # None := Sprache erkennen
 
 default_voices = {
     "ar": {"male": "ar-AE-HamdanNeural", "female": "ar-AE-FatimaNeural"},
@@ -56,6 +59,8 @@ default_voices = {
 selected_gender = "male"
 selected_voice = default_voices[known_languages[0]][selected_gender]
 
+tts_queue = queue.Queue()
+
 
 def record():
     print("recording...")
@@ -77,10 +82,11 @@ def translate(language, text):
         return None
 
 
-def textToSpeech(text, voice=selected_voice, rate="+10%"):
+def textToSpeech(voice=selected_voice, rate="+10%"):
+    text, filename = tts_queue.get()
     async def inner():
         communicate = edge_tts.Communicate(text, voice, rate=rate)
-        await communicate.save("output.mp3")
+        await communicate.save(filename)
 
     asyncio.run(inner())
 
@@ -88,6 +94,8 @@ def textToSpeech(text, voice=selected_voice, rate="+10%"):
 def play_and_delete(path):
     playsound(path)
     os.remove(path)
+    tts_queue.task_done()
+    
 
 
 def process_audio(recording):
@@ -109,13 +117,16 @@ def process_audio(recording):
         return
     print(f"übersetzter Text: {translated}")
     
-    textToSpeech(translated)
+    filename = uuid.uuid4().hex + ".mp3"
     
-    threading.Thread(target=play_and_delete, args=("output.mp3",), daemon=True).start()
+    tts_queue.put((translated, filename))
+    
+    textToSpeech()
+    
+    threading.Thread(target=play_and_delete, args=(filename,), daemon=True).start()
 
 while True:
     recording = record()
     
     threading.Thread(target=process_audio, args=(recording,), daemon=True).start()
 
-    t.sleep(4)

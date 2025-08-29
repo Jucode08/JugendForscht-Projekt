@@ -107,8 +107,9 @@ def process_audio(recording):
     # Transkription
     segments, info = model.transcribe(audio, language=selected_language, beam_size=1)
     text = " ".join([s.text for s in segments]).strip()
-
-    print(f"erkannter Text: {text}")
+    
+    if text is None: return
+    else: print(f"erkannter Text: {text}")
     
     language = info.language
     
@@ -128,5 +129,10 @@ def process_audio(recording):
 while True:
     recording = record()
     
-    threading.Thread(target=process_audio, args=(recording,), daemon=True).start()
-
+    try:
+        threading.Thread(target=process_audio, args=(recording,), daemon=True).start()
+    except Exception as e:
+        print("Error: ", e)
+        import sys
+        sys.exit()
+        

@@ -1,0 +1,24 @@
+Sprache erkannt als: en
+erkannter Text: Est-ce que tu seras ça ?
+Traceback (most recent call last):
+  File "c:\Users\julia\Documents\git_main_rep\JugendForscht-Projekt\demos\demo5.py", line 89, in <module>
+    record()
+    ~~~~~~^^
+  File "c:\Users\julia\Documents\git_main_rep\JugendForscht-Projekt\demos\demo5.py", line 33, in record
+    process_audio(recording)
+    ~~~~~~~~~~~~~^^^^^^^^^^^
+  File "c:\Users\julia\Documents\git_main_rep\JugendForscht-Projekt\demos\demo5.py", line 70, in process_audio
+    play_and_delete("output.mp3")
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "c:\Users\julia\Documents\git_main_rep\JugendForscht-Projekt\demos\demo5.py", line 82, in play_and_delete
+    playsound(path)
+    ~~~~~~~~~^^^^^^
+  File "C:\Users\julia\Documents\git_main_rep\JugendForscht-Projekt\jf-projekt\Lib\site-packages\playsound.py", line 35, in _playsoundWin
+    winCommand('open "' + sound + '" alias', alias)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\julia\Documents\git_main_rep\JugendForscht-Projekt\jf-projekt\Lib\site-packages\playsound.py", line 31, in winCommand
+    raise PlaysoundException(exceptionMessage)
+playsound.PlaysoundException:
+    Error 275 for command:
+        open "output.mp3" alias playsound_0.8707900540310186
+    Die angeforderte Datei wurde nicht gefunden. Stellen Sie sicher, dass Pfad- und Dateiname richtig sind.

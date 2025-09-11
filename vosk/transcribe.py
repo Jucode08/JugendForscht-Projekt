@@ -11,12 +11,16 @@ parser.add_argument('-l', '--lang', '--language', type=str, default="en",
 
 args = parser.parse_args()
 
-lang = args.lang
+LANG = args.lang
+SAMPLE_RATE = 16000
+BLOCK_SIZE = 3200
+
+
 # 1. Modell laden (z. B. Englisch, Deutsch, Französisch gibt es alles bei vosk)
-model = Model("vosk/models/vosk-model-small-" + lang)  # Ordner mit entpacktem Modell
+model = Model("vosk/models/vosk-model-small-" + LANG)  # Ordner mit entpacktem Modell
 
 # 2. Rekognizer initialisieren (16kHz Mono)
-rec = KaldiRecognizer(model, 16000)
+rec = KaldiRecognizer(model, SAMPLE_RATE)
 
 # 3. Queue für Audio-Daten
 audio_data_queue = queue.Queue()
@@ -27,9 +31,9 @@ def callback(indata, frames, time, status):
     audio_data_queue.put(bytes(indata))
 
 # 4. Aufnahme starten
-with sd.RawInputStream(samplerate=16000, blocksize=3200, dtype="int16",
+with sd.RawInputStream(samplerate=SAMPLE_RATE, blocksize=BLOCK_SIZE, dtype="int16",
                        channels=1, callback=callback):
-    print("Sag etwas...")
+    print("System ready. Waiting for speech...")
 
     while True:
         data = audio_data_queue.get()

@@ -8,7 +8,7 @@ import os
 import threading
 
 from utils import preprocess_ffmpeg
-from vad import split_into_speech_segments
+from tests.vad import split_into_speech_segments
 
 # imports for testing
 import sounddevice as sd
